@@ -1,0 +1,24 @@
+{
+  "name": "fusionsolar-express",
+  "version": "1.0.0",
+  "description": "Nodejs express client for Huawei FusionSolar API",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tborg2793/fusionsolar-express.git"
+  },
+  "author": "Thomas Borg",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/tborg2793/fusionsolar-express/issues"
+  },
+  "homepage": "https://github.com/tborg2793/fusionsolar-express#readme",
+  "dependencies": {
+    "express": "^4.17.1",
+    "https": "^1.0.0",
+    "request-cookies": "^1.1.0"
+  }
+}
