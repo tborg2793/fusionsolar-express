@@ -4,7 +4,7 @@ var Cookie = require('request-cookies').Cookie;
 
 const app = express()
 
-let credentials = JSON.stringify({userName: 'thomas.borg',systemCode: 'Huawei@2020'});
+let credentials = JSON.stringify({userName: '{YOUR_USER_NAME}}',systemCode: '{YOUR_PASSCODE}'});
 
 let port = process.env.PORT || 3000
 let cookies = '';
