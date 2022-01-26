@@ -1,15 +1,22 @@
 const express = require('express')
 const https = require('https');
 var Cookie = require('request-cookies').Cookie;
+const config = require('dotenv').config();
 
 const app = express()
-
-let credentials = JSON.stringify({userName: '{YOUR_USER_NAME}}',systemCode: '{YOUR_PASSCODE}'});
+const { USERNAME, SYSTEMCODE } = process.env;
+if (!USERNAME || !SYSTEMCODE) {
+	console.log('missing username or systemcode. Edit your .env file');
+	return false;
+}
+let credentials = JSON.stringify({userName: USERNAME, systemCode: SYSTEMCODE});
 
 let port = process.env.PORT || 3000
 let cookies = '';
 let xsrfTokenHeader = '';
 let stationCodeBody = '';
+let inverterCodeBody = '';
+let powerSensorCodeBody = '';
 
 
 app.get('/getStationRealKpi', async (req, res) => {
@@ -42,19 +49,35 @@ app.get('/getKpiStationYear', async(req,res) => {
 	res.end();
 });
 
+app.get('/getDevList', async(req,res) => {
+	const result = await getDevList();
+	res.send(result);
+	res.end();
+});
+
+app.get('/getInverterRealKpi', async(req,res) => {
+	const result = await getDevRealKpi(inverterCodeBody);
+	res.send(result);
+	res.end();
+});
+
+app.get('/getPowerSensorRealKpi', async(req,res) => {
+	const result = await getDevRealKpi(powerSensorCodeBody);
+	res.send(result);
+	res.end();
+});
+
 
 async function login() {
-	const authValues = await makeRequest('POST', '/thirdData/login',true, credentials , '', '');
-
+	try {
+		const authValues = await makeRequest('POST', '/thirdData/login',true, credentials , '', '');
 		for (const [key, value] of Object.entries(authValues)) {
-			console.log(key, value);
 			if(value.key == 'XSRF-TOKEN')
 			{
 				xsrfTokenHeader = value.value;
 			}
 			cookies = value.key + '=' + value.value + ';';
 		}
-
 		const stationCodeObj = await makeRequest('POST', '/thirdData/getStationList', false, '{}', xsrfTokenHeader, cookies);
 		var stationCodeJson = JSON.parse(stationCodeObj);
 		var stationCode = stationCodeJson.data[0][`stationCode`];
@@ -62,11 +85,32 @@ async function login() {
 			stationCodes: stationCode,
 			collectTime: Date.now()
 		})
+
+		var devListObj = await getDevList();
+		var devList = JSON.parse(devListObj);
+
+		// devTypeId = 47 if dev is a Power Sensor
+		var powerSensorObj = devList.data.find(obj => obj.devTypeId == 47)
+		// devTypeId = 38 if dev is a Inverter
+		var inverterObj = devList.data.find(obj => obj.devTypeId == 38)
+
+		inverterCodeBody = JSON.stringify({
+			devIds: `${inverterObj.id}`,
+			devTypeId: inverterObj.devTypeId
+		});
+		powerSensorCodeBody = JSON.stringify({
+			devIds: `${powerSensorObj.id}`,
+			devTypeId: powerSensorObj.devTypeId
+		});
+	} catch (e) {
+		throw new Error(`Quota exceed?\n ${e.message}`);
+	}
+
 }
 
 async function getKpiStationYear(){
 	const consumption = await makeRequest('POST', '/thirdData/getKpiStationYear', false, stationCodeBody, xsrfTokenHeader, cookies);
-	if(JSON.parse(consumption)["failCode"] === 306) { // relogin
+	if(!consumption || JSON.parse(consumption)["failCode"] === 306) { // relogin
 		await login()
 		consumption = await makeRequest('POST', '/thirdData/getKpiStationYear', false, stationCodeBody, xsrfTokenHeader, cookies);
 	}
@@ -76,7 +120,7 @@ async function getKpiStationYear(){
 
 async function getKpiStationMonth() {
 	const consumption = await makeRequest('POST', '/thirdData/getKpiStationMonth', false, stationCodeBody, xsrfTokenHeader, cookies);
-	if(JSON.parse(consumption)["failCode"] === 306) { // relogin
+	if(!consumption || JSON.parse(consumption)["failCode"] === 306) { // relogin
 		await login()
 		consumption = await makeRequest('POST', '/thirdData/getKpiStationMonth', false, stationCodeBody, xsrfTokenHeader, cookies);
 	}
@@ -86,7 +130,7 @@ async function getKpiStationMonth() {
 
 async function getKpiStationDay() {
 	const consumption = await makeRequest('POST', '/thirdData/getKpiStationDay', false, stationCodeBody, xsrfTokenHeader, cookies);
-	if(JSON.parse(consumption)["failCode"] === 306) { // relogin
+	if(!consumption || JSON.parse(consumption)["failCode"] === 306) { // relogin
 		await login()
 		consumption = await makeRequest('POST', '/thirdData/getKpiStationDay', false, stationCodeBody, xsrfTokenHeader, cookies);
 	}
@@ -96,7 +140,7 @@ async function getKpiStationDay() {
 
 async function getKpiStationHour() {
 	const consumption = await makeRequest('POST', '/thirdData/getKpiStationHour', false, stationCodeBody, xsrfTokenHeader, cookies);
-	if(JSON.parse(consumption)["failCode"] === 306) { // relogin
+	if(!consumption || JSON.parse(consumption)["failCode"] === 306) { // relogin
 		await login()
 		consumption = await makeRequest('POST', '/thirdData/getKpiStationHour', false, stationCodeBody, xsrfTokenHeader, cookies);
 	}
@@ -106,14 +150,35 @@ async function getKpiStationHour() {
 
 
 async function getStationRealKpi() {
-	let consumption = await makeRequest('POST', '/thirdData/getStationRealKpi', false, stationCodeBody, xsrfTokenHeader, cookies);
-	if(JSON.parse(consumption)["failCode"] === 306) { // relogin
+	try {
+		let consumption = await makeRequest('POST', '/thirdData/getStationRealKpi', false, stationCodeBody, xsrfTokenHeader, cookies);
+		if(!consumption || JSON.parse(consumption)["failCode"] === 306) { // relogin
+			await login()
+			consumption = await makeRequest('POST', '/thirdData/getStationRealKpi', false, stationCodeBody, xsrfTokenHeader, cookies);
+		}
+		return consumption;
+	} catch (e) {
+		return e.message;
+	}
+};
+
+async function getDevList() {
+	let consumption = await makeRequest('POST', '/thirdData/getDevList', false, stationCodeBody, xsrfTokenHeader, cookies);
+	if(!consumption || JSON.parse(consumption)["failCode"] === 306) { // relogin
 		await login()
-		consumption = await makeRequest('POST', '/thirdData/getStationRealKpi', false, stationCodeBody, xsrfTokenHeader, cookies);
+		consumption = await makeRequest('POST', '/thirdData/getDevList', false, stationCodeBody, xsrfTokenHeader, cookies);
 	}
     return consumption;
 };
 
+async function getDevRealKpi(body) {
+	let consumption = await makeRequest('POST', '/thirdData/getDevRealKpi', false, body, xsrfTokenHeader, cookies);
+	if(!consumption || JSON.parse(consumption)["failCode"] === 306) { // relogin
+		await login()
+		consumption = await makeRequest('POST', '/thirdData/getDevRealKpi', false, body, xsrfTokenHeader, cookies);
+	}
+    return consumption;
+};
 
 
 async function makeRequest(request_method, path, isAuth, body, xsrfToken, cookies) {
@@ -135,7 +200,6 @@ async function makeRequest(request_method, path, isAuth, body, xsrfToken, cookie
 		  if(cookies != '') {
 			  options.headers['Cookie'] = cookies;
 		  }
-
 		const req = https.request(options, res => {
 			let data = '';
 			res.on('data', (chunk) => {
