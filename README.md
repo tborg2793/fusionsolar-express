@@ -19,10 +19,26 @@ SN Inverter: [Enter the serial number of your inverter]
 You can find the serial number of your inverter in the FusionSolar portal. Go to PV System Overview > Your plant > Settings and click the Device tab. Copy the value from the column 'SN'.  
 Once your service request is approved you’ll get the credentials for your OpenAPI account.
 
-You need to add these credentials in `app.js`:  
-`let credentials = JSON.stringify({userName: '{YOUR_USER_NAME}',systemCode: '{YOUR_PASSCODE}'});`
+You need to rename the  `.env.sample` in `.env` and insert your credentials:  
+`
+USERNAME=xxxx
+SYSTEMCODE=yyyy
+`
 
 ### Endpoints
+
+#### /getDevList  
+Interface for obtaining the devices list in you plant  
+
+#### /getInverterRealKpi  
+Interface for Real-time inverter Data  
+This interface is used to obtain the real-time statistics of the inverter. You can query statistics by
+dev ID. A maximum of 100 plants can be queried at a time.
+
+#### /getPowerSensorRealKpi  
+Interface for Real-time power sensor Data  
+This interface is used to obtain the real-time statistics of the power sensor. You can query statistics by
+dev ID. A maximum of 100 plants can be queried at a time.
 
 #### /getStationRealKpi  
 Interface for Real-time Plant Data  
